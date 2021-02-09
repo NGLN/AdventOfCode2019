@@ -8,16 +8,20 @@ uses
   System.StrUtils,
   System.Types;
 
-var
-  Input: TStringList;
-
 type
   TIntCodeComputer = class(TObject)
   const
     MaxParamCount = 3;
-    pmPosition = '0';
-    pmImmediate = '1';
-    pmRelative = '2';
+    ocAdd = 1;
+    ocMultiply = 2;
+    ocInput = 3;
+    ocOutput = 4;
+    ocJumpIfTrue = 5;
+    ocJumpIfFalse = 6;
+    ocLessThen = 7;
+    ocEquals = 8;
+    ocAdjustRelativeBase = 9;
+    ocHalt = 99;
   private
     Prog: TInt64DynArray;
     Index: array[0..MaxParamCount] of Integer;
@@ -37,42 +41,42 @@ begin
   repeat
     ReadInstruction;
     case OpCode of
-      1:
+      ocAdd:
         Prog[Index[3]] := Prog[Index[1]] + Prog[Index[2]];
-      2:
+      ocMultiply:
         Prog[Index[3]] := Prog[Index[1]] * Prog[Index[2]];
-      3:
+      ocInput:
         Prog[Index[1]] := Input;
-      4:
+      ocOutput:
         begin
           Output := Prog[Index[1]];
           WriteLn(Output);
         end;
-      5:
+      ocJumpIfTrue:
         if Prog[Index[1]] <> 0 then
         begin
           Index[0] := Prog[Index[2]];
           Continue;
         end;
-      6:
+      ocJumpIfFalse:
         if Prog[Index[1]] = 0 then
         begin
           Index[0] := Prog[Index[2]];
           Continue;
         end;
-      7:
+      ocLessThen:
         if Prog[Index[1]] < Prog[Index[2]] then
           Prog[Index[3]] := 1
         else
           Prog[Index[3]] := 0;
-      8:
+      ocEquals:
         if Prog[Index[1]] = Prog[Index[2]] then
           Prog[Index[3]] := 1
         else
           Prog[Index[3]] := 0;
-      9:
+      ocAdjustRelativeBase:
         Inc(RelativeBase, Prog[Index[1]]);
-      99:
+      ocHalt:
         Break;
     end;
     Inc(Index[0], ParamCount + 1);
@@ -101,11 +105,11 @@ end;
 function TIntCodeComputer.ParamCount: Integer;
 begin
   case OpCode of
-    1, 2, 7, 8:
+    ocAdd, ocMultiply, ocLessThen, ocEquals:
       Result := 3;
-    3, 4, 9:
+    ocInput, ocOutput, ocAdjustRelativeBase:
       Result := 1;
-    5, 6:
+    ocJumpIfTrue, ocJumpIfFalse:
       Result := 2;
     else
       Result := 0;
@@ -113,29 +117,40 @@ begin
 end;
 
 procedure TIntCodeComputer.ReadInstruction;
+const
+  pmPosition = '0';
+  pmImmediate = '1';
+  pmRelative = '2';
 var
-  S: String;
-  J: Integer;
-begin
-  S := IntToStr(Prog[Index[0]]);
-  S := StringOfChar('0', 5 - Length(S)) + S;
-  OpCode := StrToInt(RightStr(S, 2));
-  EnsureIndex(Index[0] + ParamCount);
-  for J := 1 to ParamCount do
+  Instruction: String;
+  I: Integer;
+
+  function ParameterMode: Char;
   begin
-    case S[5 - 2 - J + 1] of
+    Result := Instruction[5 - 2 - I + 1];
+  end;
+
+begin
+  Instruction := IntToStr(Prog[Index[0]]);
+  Instruction := StringOfChar('0', 5 - Length(Instruction)) + Instruction;
+  OpCode := StrToInt(RightStr(Instruction, 2));
+  EnsureIndex(Index[0] + ParamCount);
+  for I := 1 to ParamCount do
+  begin
+    case ParameterMode of
       pmPosition:
-        Index[J] := Prog[Index[0] + J];
+        Index[I] := Prog[Index[0] + I];
       pmImmediate:
-        Index[J] := Index[0] + J;
+        Index[I] := Index[0] + I;
       pmRelative:
-        Index[J] := Prog[Index[0] + J] + RelativeBase;
+        Index[I] := Prog[Index[0] + I] + RelativeBase;
     end;
-    EnsureIndex(Index[J] + ParamCount);
+    EnsureIndex(Index[I] + ParamCount);
   end;
 end;
 
 var
+  Input: TStringList;
   Computer: TIntCodeComputer;
 
 begin
