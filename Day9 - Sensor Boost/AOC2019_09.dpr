@@ -14,96 +14,72 @@ var
 type
   TIntCodeComputer = class(TObject)
   const
-    ParamCount = 3;
+    MaxParamCount = 3;
     pmPosition = '0';
     pmImmediate = '1';
     pmRelative = '2';
   private
     Prog: TInt64DynArray;
-    // TODO: Index array should be of type Integer, but then ParamCount should
-    //       be made dependend on OpCode first!!
-    Index: array[0..ParamCount] of Int64;
+    Index: array[0..MaxParamCount] of Integer;
     OpCode: Byte;
     RelativeBase: Integer;
     Input: Int64;
     Output: Int64;
-    function Boost(BreakOnInput: Boolean = False): Boolean;
-    procedure EnsureIndex(AIndex: Int64);
+    procedure Boost;
+    procedure EnsureIndex(AIndex: Integer);
     procedure Init(ProgLines: TStrings);
+    function ParamCount: Integer;
     procedure ReadInstruction;
   end;
 
-function TIntCodeComputer.Boost(BreakOnInput: Boolean = False): Boolean;
+procedure TIntCodeComputer.Boost;
 begin
-  Result := False;
   repeat
     ReadInstruction;
     case OpCode of
       1:
-        begin
-          Prog[Index[3]] := Prog[Index[1]] + Prog[Index[2]];
-          Inc(Index[0], 4);
-        end;
+        Prog[Index[3]] := Prog[Index[1]] + Prog[Index[2]];
       2:
-        begin
-          Prog[Index[3]] := Prog[Index[1]] * Prog[Index[2]];
-          Inc(Index[0], 4);
-        end;
+        Prog[Index[3]] := Prog[Index[1]] * Prog[Index[2]];
       3:
-        begin
-          Prog[Index[1]] := Input;
-          Inc(Index[0], 2);
-          if BreakOnInput then
-            Break;
-        end;
+        Prog[Index[1]] := Input;
       4:
         begin
           Output := Prog[Index[1]];
-          Inc(Index[0], 2);
-          Result := True;
           WriteLn(Output);
         end;
       5:
         if Prog[Index[1]] <> 0 then
-          Index[0] := Prog[Index[2]]
-        else
-          Inc(Index[0], 3);
+        begin
+          Index[0] := Prog[Index[2]];
+          Continue;
+        end;
       6:
         if Prog[Index[1]] = 0 then
-          Index[0] := Prog[Index[2]]
-        else
-          Inc(Index[0], 3);
+        begin
+          Index[0] := Prog[Index[2]];
+          Continue;
+        end;
       7:
-        begin
-          if Prog[Index[1]] < Prog[Index[2]] then
-            Prog[Index[3]] := 1
-          else
-            Prog[Index[3]] := 0;
-          Inc(Index[0], 4);
-        end;
+        if Prog[Index[1]] < Prog[Index[2]] then
+          Prog[Index[3]] := 1
+        else
+          Prog[Index[3]] := 0;
       8:
-        begin
-          if Prog[Index[1]] = Prog[Index[2]] then
-            Prog[Index[3]] := 1
-          else
-            Prog[Index[3]] := 0;
-          Inc(Index[0], 4);
-        end;
+        if Prog[Index[1]] = Prog[Index[2]] then
+          Prog[Index[3]] := 1
+        else
+          Prog[Index[3]] := 0;
       9:
-        begin
-          Inc(RelativeBase, Prog[Index[1]]);
-          Inc(Index[0], 2);
-        end;
+        Inc(RelativeBase, Prog[Index[1]]);
       99:
-        begin
-          Result := False;
-          Break;
-        end;
+        Break;
     end;
+    Inc(Index[0], ParamCount + 1);
   until False;
 end;
 
-procedure TIntCodeComputer.EnsureIndex(AIndex: Int64);
+procedure TIntCodeComputer.EnsureIndex(AIndex: Integer);
 begin
   if Length(Prog) <= AIndex then
     SetLength(Prog, AIndex + 1);
@@ -122,6 +98,20 @@ begin
   Output := 0;
 end;
 
+function TIntCodeComputer.ParamCount: Integer;
+begin
+  case OpCode of
+    1, 2, 7, 8:
+      Result := 3;
+    3, 4, 9:
+      Result := 1;
+    5, 6:
+      Result := 2;
+    else
+      Result := 0;
+  end;
+end;
+
 procedure TIntCodeComputer.ReadInstruction;
 var
   S: String;
@@ -131,7 +121,6 @@ begin
   S := StringOfChar('0', 5 - Length(S)) + S;
   OpCode := StrToInt(RightStr(S, 2));
   EnsureIndex(Index[0] + ParamCount);
-  // TODO: ParamCount should depend on OpCode!! Array might be set too long!!
   for J := 1 to ParamCount do
   begin
     case S[5 - 2 - J + 1] of
@@ -156,15 +145,15 @@ begin
     Input.LoadFromFile('input.txt');
     Input.CommaText := Input[0];
   { Part I }
+    Write('Part I: ');
     Computer.Init(Input);
     Computer.Input := 1;
     Computer.Boost;
-    WriteLn('Part I: ', Computer.Output);
   { Part II }
+    Write('Part II: ');
     Computer.Init(Input);
     Computer.Input := 2;
     Computer.Boost;
-    WriteLn('Part II: ', Computer.Output);
   finally
     Computer.Free;
     Input.Free;
